@@ -6,6 +6,7 @@ from calc import Calc
 
 class UI:
     t_de_de = {
+        '**Travel Information**': '**Information**',
         "Please select begin and end of travel": "Bitte Reisebeginn und Ende auswählen",
         'Begin of travel': 'Anfang der Reise',
         'End of travel': 'Ende der Reise',
@@ -16,6 +17,12 @@ class UI:
         'Date': 'Datum',
         'Time': 'Uhrzeit',
         'Day': 'Tag',
+
+        'Departing day': 'Tagespauschale (Abfahrt)',
+        'Full days': 'Volle Tage',
+        'Arriving day': 'Tagespauschale (Ankunft)',
+        '**Sum**': '**Summe**',
+        'Reimbursement Total': 'Summen',
     }
 
     def __init__(self, calc: Calc) -> None:
@@ -72,6 +79,7 @@ class UI:
 
     def left_row(self):
         with ui.card():
+            ui.markdown(self.t('**Travel Information**'))
             ui.label(self.t('Begin of travel'))
             with ui.column():
                 self.date_picker("from_date")
@@ -85,28 +93,50 @@ class UI:
                 self.calc.destination = vcea.value
             ui.select(self.calc.countries, on_change=on_change)
 
-            ui.button(self.t('Refresh'), on_click=lambda: self.deduction_grid.refresh())
+            ui.button(self.t('Refresh'), on_click=lambda: self.deduction_grid.refresh()).classes("print-hide")
 
     def right_row(self):
         with ui.column():
             with ui.card():
-                ui.label(self.t("Meal deductions"))
+                ui.markdown(f'**{self.t("Meal deductions")}**')
                 self.deduction_grid()
+    
+            ui.html('<div style="break-after:page;" class="print-only"></div>', sanitize=False)
+            ui.html('<div style="margin-top: 4em" class="print-only"></div>', sanitize=False)
+
             with ui.card():
                 self.result()
 
     @ui.refreshable_method
     def result(self):
-        try:
-            ui.label(f"{self.calc.calculate()}€")
-        except AssertionError as e:
-            ui.label(f"Error: {e}")
+        ui.markdown(f'**{self.t("Reimbursement Total")}**')
+
+        with ui.grid(columns=2):
+
+            try:
+                res = self.calc.calculate()
+            except AssertionError as e:
+                res = 0
+        
+            ui.label(self.t('Departing day'))
+            ui.label(f'{self.calc.per_diem_rate().half_day} €').style('text-align: right')
+            ui.label(self.t('Full days'))
+            ui.label(f'{self.calc.per_diem_full_days()} €').style('text-align: right')
+            ui.label(self.t('Arriving day'))
+            ui.label(f'{self.calc.per_diem_rate().half_day} €').style('text-align: right')
+            ui.label(self.t('Meal deductions'))
+            ui.label(f'{res - (2 * self.calc.per_diem_rate().half_day + self.calc.per_diem_full_days())} €').style('text-align: right')
+
+            ui.separator()
+            ui.separator()
+            ui.markdown(self.t('**Sum**'))
+            ui.markdown(f"**{res} €**").style('text-align: right')
 
     def menu(self):
         with ui.header(elevated=True).style('background-color: #3874c8').classes('items-center justify-between'):
             ui.label(self.t('Travel Reimbursement 2025'))
 
-            with ui.button(icon='menu'):
+            with ui.button(icon='menu').classes("print-hide"):
                 with ui.menu(): 
                     ui.link('/en-US', '/en-US')
                     ui.separator()
@@ -126,13 +156,14 @@ class UI:
             </script>
         ''')
 
-        with ui.row():
+        with ui.grid(columns=2):
             self.left_row()
             self.right_row()
 
     def root(self):
+        ui.add_css("@media print {font-size: 12px}")
         self.menu()
         ui.sub_pages({'/{language_code}': self.index, '/': self.index})
 
     def run(self):
-        ui.run(self.root)
+        ui.run(self.root, title="Travel Reimbursement")

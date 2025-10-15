@@ -42,6 +42,21 @@ class Calc:
         self.to_time: time | None = None
         self.meal_deductions: list[list[bool]] = []
 
+    
+    def per_diem_rate(self) -> Tagespauschale:
+        tagespauschale = None
+        for t in self.tagespauschalen:
+            if t.country == self.countries[self.destination]:
+                tagespauschale = t
+                break
+        assert tagespauschale is not None
+        return tagespauschale
+
+    def per_diem_full_days(self) -> int:
+        if self.to_date is None or self.from_date is None:
+            return 0
+        return self.per_diem_rate().full_day * ((self.to_date - self.from_date).days - 1)
+
 
     def calculate(self) -> int:
         assert self.from_date is not None
@@ -49,12 +64,7 @@ class Calc:
         assert self.to_date is not None
         assert self.to_time is not None
 
-        tagespauschale = None
-        for t in self.tagespauschalen:
-            if t.country == self.countries[self.destination]:
-                tagespauschale = t
-                break
-        assert tagespauschale is not None
+        tagespauschale = self.per_diem_rate()
 
         def meal_deduction(day, amount):
             assert tagespauschale is not None
