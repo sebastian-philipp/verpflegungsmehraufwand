@@ -83,5 +83,4 @@ class Calc:
         day_amouts.extend([tagespauschale.full_day] * ((self.to_date - self.from_date).days - 1))
         day_amouts.append(tagespauschale.half_day)
 
-        return [meal_deduction(i, a) for i,a in enumerate(day_amouts)]
         return sum([meal_deduction(i, a) for i,a in enumerate(day_amouts)])

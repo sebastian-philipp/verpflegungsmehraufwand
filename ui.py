@@ -1,16 +1,34 @@
-from datetime import date, time, datetime, timedelta
+from datetime import datetime, timedelta
+import locale
 from nicegui import __version__, ui
-from nicegui.elements.grid import Grid
 
 from calc import Calc
 
 class UI:
+    t_de_de = {
+        "Please select begin and end of travel": "Bitte Reisebeginn und Ende auswählen",
+        'Begin of travel': 'Anfang der Reise',
+        'End of travel': 'Ende der Reise',
+        'Destination': 'Reiseland',
+        'Refresh': 'Aktualisieren',
+        'Meal deductions': "Abzüge der Verpflegungspauschale",
+        'Travel Reimbursement 2025': 'Reisekosten 2025',
+        'Date': 'Datum',
+        'Time': 'Uhrzeit',
+        'Day': 'Tag',
+    }
+
     def __init__(self, calc: Calc) -> None:
         self.calc = calc
         self.language = "en-US"
 
+    def t(self, txt):
+        if self.language == "de-DE":
+            return self.t_de_de[txt]
+        return txt
+
     def date_picker(self, attrname):
-        with ui.input('Date') as date_input:
+        with ui.input(self.t('Date')) as date_input:
             with ui.menu().props('no-parent-event') as menu:
                 with ui.date().bind_value(date_input):
                     with ui.row().classes('justify-end'):
@@ -20,7 +38,7 @@ class UI:
             date_input.on_value_change(lambda x: setattr(self.calc, attrname, datetime.strptime(x.value, "%Y-%m-%d").date()))
 
     def time_picker(self, attrname):
-        with ui.input('Time') as time_input:
+        with ui.input(self.t('Time')) as time_input:
             with ui.menu().props('no-parent-event') as menu:
                 with ui.time().bind_value(time_input):
                     with ui.row().classes('justify-end'):
@@ -35,13 +53,13 @@ class UI:
         with ui.grid(columns=4):
             self.calc.meal_deductions.clear()
             if self.calc.from_date == None or self.calc.to_date == None:
-                ui.label("Bitte Reisebeginn und Ende auswählen")
+                ui.label(self.t("Please select begin and end of travel"))
                 return
             delta = self.calc.to_date - self.calc.from_date
             for i in range(delta.days + 1):
                 self.calc.meal_deductions.append([False, False, False])
                 current_day = self.calc.from_date + timedelta(days=i)
-                ui.label(f'Day {current_day}')
+                ui.label(f'{self.t("Day")} {current_day.strftime("%x")}')
 
                 def set(row, column, val):
                     self.calc.meal_deductions[row][column] = val
@@ -54,25 +72,25 @@ class UI:
 
     def left_row(self):
         with ui.card():
-            ui.label('Begin der Reise')
+            ui.label(self.t('Begin of travel'))
             with ui.column():
                 self.date_picker("from_date")
                 self.time_picker("from_time")
-            ui.label('Ende der Reise')
+            ui.label(self.t('End of travel'))
             with ui.column():
                 self.date_picker("to_date")
                 self.time_picker("to_time")
-            ui.label('Reiseland')
+            ui.label(self.t('Destination'))
             def on_change(vcea):
                 self.calc.destination = vcea.value
             ui.select(self.calc.countries, on_change=on_change)
 
-            ui.button('Aktualisieren', on_click=lambda: self.deduction_grid.refresh())
+            ui.button(self.t('Refresh'), on_click=lambda: self.deduction_grid.refresh())
 
     def right_row(self):
         with ui.column():
             with ui.card():
-                ui.label("Verpflegungsabzüge")
+                ui.label(self.t("Meal deductions"))
                 self.deduction_grid()
             with ui.card():
                 self.result()
@@ -84,35 +102,37 @@ class UI:
         except AssertionError as e:
             ui.label(f"Error: {e}")
 
-    def run(self):
-        ui.add_body_html(f'''
-            <script src="/_nicegui/{__version__}/static/lang/de.umd.prod.js"></script>
-            <script src="/_nicegui/{__version__}/static/lang/fr.umd.prod.js"></script>
-            <script src="/_nicegui/{__version__}/static/lang/es.umd.prod.js"></script>
-            <script src="/_nicegui/{__version__}/static/lang/zh-CN.umd.prod.js"></script>
-        ''')        
+    def menu(self):
         with ui.header(elevated=True).style('background-color: #3874c8').classes('items-center justify-between'):
-            ui.label('Reisekosten 2025')
+            ui.label(self.t('Travel Reimbursement 2025'))
+
+            with ui.button(icon='menu'):
+                with ui.menu(): 
+                    ui.link('/en-US', '/en-US')
+                    ui.separator()
+                    ui.link('/de-DE', '/de-DE')
 
 
-            def switch_language(language_code: str) -> None:
-                self.language = language_code
-                ui.run_javascript(f'''
+    def index(self, language_code: str = "en-US"):
+        self.language = language_code
+        locale.setlocale(locale.LC_ALL, self.language.replace("-", "_") + ".UTF-8")
+
+        ui.add_body_html(f'''
+            <script defer src="/_nicegui/{__version__}/static/lang/{language_code}.umd.prod.js"></script>
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {{
                     Quasar.lang.set(Quasar.lang["{language_code.replace('-', '')}"])
-                ''')
+                }})
+            </script>
+        ''')
 
-
-            ui.select(options={
-                'de': 'Deutsch',
-                'en': 'English',
-                'fr': 'Français',
-                'es': 'Español',
-                'zh-CN': '中文',
-            }, value='en', on_change=lambda e: switch_language(e.value))
-
-        ui.date()
         with ui.row():
             self.left_row()
             self.right_row()
-        
-        ui.run()
+
+    def root(self):
+        self.menu()
+        ui.sub_pages({'/{language_code}': self.index, '/': self.index})
+
+    def run(self):
+        ui.run(self.root)
