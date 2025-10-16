@@ -57,7 +57,7 @@ class UI:
 
     @ui.refreshable_method
     def deduction_grid(self):
-        with ui.grid(columns=4):
+        with ui.grid(columns=4).classes("items-center"):
             self.calc.meal_deductions.clear()
             if self.calc.from_date == None or self.calc.to_date == None:
                 ui.label(self.t("Please select begin and end of travel"))
@@ -78,46 +78,52 @@ class UI:
             self.result.refresh()
 
     def left_row(self):
-        with ui.card():
-            ui.markdown(self.t('**Travel Information**'))
-            ui.label(self.t('Begin of travel'))
-            with ui.column():
-                self.date_picker("from_date")
-                self.time_picker("from_time")
-            ui.label(self.t('End of travel'))
-            with ui.column():
-                self.date_picker("to_date")
-                self.time_picker("to_time")
-            ui.label(self.t('Destination'))
-            def on_change(vcea):
-                self.calc.destination = vcea.value
-            ui.select(self.calc.countries, on_change=on_change)
+        with ui.column().classes("col-3"):
+            with ui.card().classes("full-width no-row-gap"):
+                ui.markdown(self.t('**Employee**'))
+                ui.textarea().classes("full-width")
+                ui.markdown(self.t('**Recipient**'))
+                ui.textarea().classes("full-width")
+            with ui.card().classes("full-width"):
+                ui.markdown(self.t('**Travel Information**'))
+                ui.label(self.t('Begin of travel'))
+                with ui.column():
+                    self.date_picker("from_date")
+                    self.time_picker("from_time")
+                ui.label(self.t('End of travel'))
+                with ui.column():
+                    self.date_picker("to_date")
+                    self.time_picker("to_time")
+                ui.label(self.t('Destination'))
+                def on_change(vcea):
+                    self.calc.destination = vcea.value
+                ui.select(self.calc.countries, on_change=on_change)
 
-            ui.button(self.t('Refresh'), on_click=lambda: self.deduction_grid.refresh()).classes("print-hide")
+                ui.button(self.t('Refresh'), on_click=lambda: self.deduction_grid.refresh()).classes("print-hide")
 
     def right_row(self):
         with ui.column():
-            with ui.card():
+            with ui.card().classes("full-width"):
                 ui.markdown(f'**{self.t("Meal deductions")}**')
                 self.deduction_grid()
     
             ui.html('<div style="break-after:page;" class="print-only"></div>', sanitize=False)
             ui.html('<div style="margin-top: 4em" class="print-only"></div>', sanitize=False)
 
-            with ui.card():
+            with ui.card().classes("full-width"):
                 self.result()
 
     @ui.refreshable_method
     def result(self):
         ui.markdown(f'**{self.t("Reimbursement Total")}**')
 
-        with ui.grid(columns=2):
+        try:
+            res = self.calc.calculate()
+        except AssertionError as e:
+            res = 0
+            ui.label(f"Error: {repr(e)}")
 
-            try:
-                res = self.calc.calculate()
-            except AssertionError as e:
-                res = 0
-        
+        with ui.grid(columns=2):        
             ui.label(self.t('Departing day'))
             ui.label(f'{self.calc.per_diem_rate().half_day} €').style('text-align: right')
             ui.label(self.t('Full days'))
@@ -156,12 +162,20 @@ class UI:
             </script>
         ''')
 
-        with ui.grid(columns=2):
+        with ui.row().classes("no-wrap"):
             self.left_row()
             self.right_row()
 
     def root(self):
-        ui.add_css("@media print {font-size: 12px}")
+        ui.add_css("""
+            @media print {
+                font-size: 12px; 
+                line-height: 80%;
+            }
+            .no-row-gap {
+                row-gap: 0;
+            }
+            """)
         self.menu()
         ui.sub_pages({'/{language_code}': self.index, '/': self.index})
 
